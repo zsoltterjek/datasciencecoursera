@@ -1,0 +1,99 @@
+---
+title: "Prediction assignment writeup"
+author: "Zsolt Terjek"
+date: "2023-08-05"
+output: html_document
+  
+---
+
+First loading the libraries
+
+```{r libraries, results= "hide"}
+library(caret)
+library(randomForest)
+```
+
+Reading the two datasets
+
+```{r reading}
+training <- read.csv("C:/Users/zterjek/Desktop/pml-training.csv")
+testing <- read.csv("C:/Users/zterjek/Desktop/pml-testing.csv")
+```
+
+Since both of them contain columns with NAs remove these columns
+
+```{r NA column remove}
+nas_tr <- colSums(is.na(training)) > 0
+
+names_tr <- colnames(training)
+cols_tr  <- names_tr[!nas_tr]
+
+training <- training[,cols_tr]
+
+na_training <- is.na(training)
+sum(na_training)
+#####################################
+nas_te <- colSums(is.na(testing)) > 0
+
+names_te <- colnames(testing)
+cols_te  <- names_te[!nas_te]
+
+testing <- testing[,cols_te]
+
+na_testing <- is.na(testing)
+sum(na_testing)
+```
+
+Since the first seven columns contain data not useful for this analysis, remove them
+
+```{r unused column remove}
+train <- training[, -c(1:7)]
+test <- testing[, -c(1:7)]
+```
+
+Remove the near zero variance columns from train set
+
+```{r Near Zero Variance}
+zvtrain <- nearZeroVar(train)
+train <- train[,-zvtrain]
+```
+
+Splitting the train set to a training and a crossvalidation part
+
+```{r split the training}
+inTrain <- createDataPartition(y = train$classe, p = 0.75, list = FALSE)
+
+traintrain <- train[inTrain,]
+trainvalid <-  train[-inTrain,]
+```
+
+Since the outcome variable is categorical with five levels and we have a quite amount of predictors let's try three methods: Multinomial Logistic Regression, Decision Tree and Random Forest
+
+```{r fit the three models, results="hide"}
+modmulti <- train(classe ~ ., data = traintrain, method = "multinom")
+
+modrpart <- train(classe ~., data = traintrain, method = "rpart")
+
+modrf <- train(classe ~., data = traintrain, method = "rf")
+```
+
+Let's make predictions with the three models to the validation part of training set and check th accuracy of them
+
+```{r cross validation}
+predmulti <- predict(modmulti, trainvalid)
+predrpart <- predict(modrpart, trainvalid)
+predrf <- predict(modrf, trainvalid)
+
+class <- as.factor(trainvalid$classe)
+
+confusionMatrix(predmulti, class)
+confusionMatrix(predrpart, class)
+confusionMatrix(predrf, class)
+```
+
+The  Random Forest seems to be the most accurate of the models so let's do the prediction of the test set with this method
+
+```{r predict test set}
+pred <- predict(modrf, test)
+pred
+```
